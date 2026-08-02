@@ -1,4 +1,4 @@
-# MySearchEngine
+# SearchEngine
 
 C++ 搜索引擎，基于 muduo 网络库、cppjieba 分词、SimHash 去重、TF-IDF 排序。
 
