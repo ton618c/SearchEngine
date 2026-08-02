@@ -1,0 +1,12 @@
+# 编译产物
+build/
+offline
+server
+client
+
+# 生成的离线数据（可重新生成）
+data/
+
+# IDE
+compile_commands.json
+.cache/
