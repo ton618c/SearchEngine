@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySearchEngine</title>
+    <style>
+        /* ============================================================
+           全局样式
+           ============================================================ */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:        #f5f5f5;
+            --white:     #ffffff;
+            --border:    #e0e0e0;
+            --text:      #333333;
+            --text-muted:#888888;
+            --primary:   #1a73e8;
+            --primary-hover: #1557b0;
+            --suggest-bg:#ffffff;
+            --suggest-hover: #f0f7ff;
+            --shadow:    0 2px 8px rgba(0,0,0,0.08);
+            --radius:    8px;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                         "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ============================================================
+           页面布局
+           ============================================================ */
+        .page {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* LOGO 区域 */
+        .logo-area {
+            text-align: center;
+            margin: 60px 0 30px 0;
+        }
+        .logo-area h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+        .logo-area p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 6px;
+        }
+
+        /* 搜索栏容器 */
+        .search-box {
+            position: relative;     /* 为了让建议下拉框相对定位 */
+            background: var(--white);
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            transition: box-shadow 0.2s;
+        }
+        .search-box:focus-within {
+            box-shadow: 0 2px 12px rgba(26,115,232,0.15);
+            border-color: var(--primary);
+        }
+
+        /* 搜索输入框 */
+        .search-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            padding: 14px 8px;
+            background: transparent;
+        }
+
+        /* 搜索按钮 */
+        .search-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .search-btn:hover { background: var(--primary-hover); }
+
+        /* ============================================================
+           下拉建议框
+           ============================================================ */
+        .suggest-dropdown {
+            position: absolute;
+            top: 52px;              /* 紧贴搜索框下方 */
+            left: 0;
+            right: 0;
+            background: var(--suggest-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            display: none;          /* 默认隐藏，有结果时 JS 设为 block */
+            z-index: 100;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .suggest-dropdown.active {
+            display: block;
+        }
+
+        /* 每条建议 */
+        .suggest-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.15s;
+        }
+        .suggest-item:last-child { border-bottom: none; }
+        .suggest-item:hover { background: var(--suggest-hover); }
+
+        /* ============================================================
+           搜索结果列表
+           ============================================================ */
+        .results-area {
+            margin-top: 30px;
+        }
+
+        /* 每条搜索结果卡片 */
+        .result-card {
+            background: var(--white);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            transition: box-shadow 0.2s;
+        }
+        .result-card:hover {
+            box-shadow: var(--shadow);
+        }
+        .result-card .title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--primary);
+            text-decoration: none;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .result-card .title:hover { text-decoration: underline; }
+        .result-card .abstract {
+            font-size: 0.85rem;
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 4px;
+        }
+        .result-card .link {
+            font-size: 0.78rem;
+            color: #2d7d2d;
+            word-break: break-all;
+        }
+
+        /* 空状态 / 加载状态 */
+        .status-msg {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 40px 0;
+            font-size: 0.95rem;
+        }
+        .spinner {
+            display: inline-block;
+            width: 24px; height: 24px;
+            border: 2px solid #e0e0e0;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ============================================================
+           响应式
+           ============================================================ */
+        @media (max-width: 600px) {
+            .page { padding: 20px 12px; }
+            .logo-area { margin-top: 30px; }
+            .logo-area h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page">
+    <!-- LOGO + 标题 -->
+    <div class="logo-area">
+        <h1>🔍 MySearchEngine</h1>
+        <p>中文搜索引擎 — 关键字推荐 &amp; 网页搜索</p>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div style="position:relative;">
+        <div class="search-box">
+            <input type="text"
+                   class="search-input"
+                   id="searchInput"
+                   placeholder="输入关键词搜索..."
+                   autocomplete="off"
+                   autofocus>
+            <button class="search-btn" id="searchBtn">搜索</button>
+        </div>
+
+        <!-- 下拉建议框 — JS 动态填充 -->
+        <div class="suggest-dropdown" id="suggestDropdown"></div>
+    </div>
+
+    <!-- 搜索结果区域 -->
+    <div class="results-area" id="resultsArea">
+        <div class="status-msg">👆 在上方输入关键词开始搜索</div>
+    </div>
+</div>
+
+<script>
+// ============================================================================
+// 前端交互逻辑
+// ============================================================================
+
+const input       = document.getElementById('searchInput');
+const btn         = document.getElementById('searchBtn');
+const suggestBox  = document.getElementById('suggestDropdown');
+const resultsArea = document.getElementById('resultsArea');
+
+let suggestTimer = null;       // 防抖定时器
+const DEBOUNCE_MS = 200;      // 输入停止 200ms 后才发 suggest 请求
+
+// ── 关键字推荐（suggest）─────────────────────────────────────
+//  输入框 oninput → 防抖 → fetch /api/suggest?q=xxx
+//  数据链路: 浏览器 → HTTP → wfrest网关 → TLV type=1 → muduo server
+//           muduo KeywordRecommender.recommend() → JSON → 返回
+async function fetchSuggest(q) {
+    // 空输入不请求
+    if (!q.trim()) {
+        suggestBox.innerHTML = '';
+        suggestBox.classList.remove('active');
+        return;
+    }
+
+    try {
+        // http://网关IP:8080/api/suggest?q=花
+        const resp = await fetch(`/api/suggest?q=${encodeURIComponent(q)}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        const data = await resp.json();
+
+        // muduo server 返回 JSON 数组: ["花生","花生米",...]
+        // 也可能返回 {"status":"error",...}
+        if (Array.isArray(data)) {
+            renderSuggest(data);
+        } else if (data.status === 'error') {
+            console.warn('Suggest error:', data.message);
+            suggestBox.innerHTML = '';
+            suggestBox.classList.remove('active');
+        }
+    } catch (err) {
+        console.error('fetchSuggest failed:', err);
+    }
+}
+
+// 渲染下拉建议列表
+function renderSuggest(items) {
+    if (!items.length) {
+        suggestBox.classList.remove('active');
+        return;
+    }
+    suggestBox.innerHTML = items
+        .map(item => `<div class="suggest-item">${escapeHtml(item)}</div>`)
+        .join('');
+    suggestBox.classList.add('active');
+
+    // 点击建议项 → 填入输入框并触发搜索
+    suggestBox.querySelectorAll('.suggest-item').forEach(el => {
+        el.addEventListener('click', () => {
+            input.value = el.textContent;
+            suggestBox.classList.remove('active');
+            doSearch();   // 直接搜索
+        });
+    });
+}
+
+// ── 网页搜索（search）────────────────────────────────────────
+//  点搜索按钮/回车/点击建议项 → fetch /api/search?q=xxx
+//  数据链路: 浏览器 → HTTP → wfrest网关 → TLV type=2 → muduo server
+//           muduo PageRecommender.recommend() → JSON → 返回
+async function doSearch() {
+    const q = input.value.trim();
+    if (!q) return;
+
+    // 隐藏建议框
+    suggestBox.classList.remove('active');
+
+    // 显示加载状态
+    resultsArea.innerHTML = '<div class="status-msg"><span class="spinner"></span>搜索中...</div>';
+
+    try {
+        // http://网关IP:8080/api/search?q=冬奥中国队
+        const resp = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        const data = await resp.json();
+
+        // muduo server 返回 JSON 数组:
+        //   [{"id":250,"title":"...","link":"http://...","abstract":"..."}, ...]
+        // 也可能返回 {"status":"error",...}
+        if (Array.isArray(data)) {
+            renderResults(data);
+        } else if (data.status === 'error') {
+            resultsArea.innerHTML = `<div class="status-msg">⚠️ ${escapeHtml(data.message)}</div>`;
+        }
+    } catch (err) {
+        console.error('doSearch failed:', err);
+        resultsArea.innerHTML = '<div class="status-msg">⚠️ 搜索失败，请检查后端服务是否运行</div>';
+    }
+}
+
+// 渲染搜索结果列表
+function renderResults(items) {
+    if (!items.length) {
+        resultsArea.innerHTML = '<div class="status-msg">😕 未找到相关结果</div>';
+        return;
+    }
+
+    resultsArea.innerHTML = items.map(item => `
+        <div class="result-card">
+            <a class="title" href="${escapeAttr(item.link)}" target="_blank">
+                ${escapeHtml(item.title)}
+            </a>
+            <div class="abstract">${escapeHtml(item.abstract || '')}</div>
+            <div class="link">${escapeHtml(item.link || '')}</div>
+        </div>
+    `).join('');
+}
+
+// ── 工具函数 ─────────────────────────────────────────────────
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+function escapeAttr(str) {
+    return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ── 事件绑定 ─────────────────────────────────────────────────
+
+// 输入框 oninput: 防抖后拉取 suggest
+input.addEventListener('input', () => {
+    clearTimeout(suggestTimer);
+    suggestTimer = setTimeout(() => fetchSuggest(input.value), DEBOUNCE_MS);
+});
+
+// 点搜索按钮
+btn.addEventListener('click', doSearch);
+
+// 回车搜索
+input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        clearTimeout(suggestTimer);
+        suggestBox.classList.remove('active');
+        doSearch();
+    }
+});
+
+// 点页面其他地方关闭建议框
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-box')) {
+        suggestBox.classList.remove('active');
+    }
+});
+</script>
+
+</body>
+</html>

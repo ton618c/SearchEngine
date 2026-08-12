@@ -3,10 +3,11 @@ build/
 offline
 server
 client
-
+http_gateway
 # 生成的离线数据（可重新生成）
 data/
 
 # IDE
 compile_commands.json
 .cache/
+CLAUDE.md

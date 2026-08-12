@@ -48,3 +48,12 @@ add_executable(client
 )
 target_compile_options(client PRIVATE -g)
 target_link_libraries(client PRIVATE muduo_net muduo_base pthread)
+
+# ── HTTP 网关（浏览器 ↔ muduo 的桥梁）──
+# 浏览器发 HTTP → 本网关编码成 TLV → 发给 muduo server
+# muduo server 返回 TLV → 本网关解码 → HTTP JSON 返回浏览器
+add_executable(http_gateway
+    src/http_gateway.cc
+)
+target_compile_options(http_gateway PRIVATE -g)
+target_link_libraries(http_gateway PRIVATE wfrest pthread)
